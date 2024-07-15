@@ -6,6 +6,7 @@ import os
 from difflib import SequenceMatcher
 from typing import Any
 
+import headerfiles
 from data_prep import introspector
 from experiment import benchmark as benchmarklib
 
@@ -54,7 +55,7 @@ class ContextRetriever:
   def _get_source_file(self, item: dict) -> str:
     return self._get_nested_item(item, 'source', 'source_file')
 
-  def _get_files_to_include(self) -> list[str]:
+  def _infer_files_via_types(self) -> list[str]:
     """Retrieves files to include.
     These files are found from the source files for complex types seen
     in the function declaration."""
@@ -104,6 +105,16 @@ class ContextRetriever:
         files.add(include_file)
 
     return list(files)
+
+  def _get_files_to_include(self) -> list[str]:
+    proj_header_files = headerfiles.get_proj_headers(self._benchmark.project)
+    type_based_files = self._infer_files_via_types()
+
+    header_files = proj_header_files
+    for file in type_based_files:
+      if file not in header_files:
+        header_files.append(file)
+    return header_files
 
   def _clean_type(self, type_name: str) -> str:
     """Cleans a type so that it can be fetched from FI."""

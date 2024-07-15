@@ -42,11 +42,11 @@ DEBUG: bool = False
 # #182 shows Gemini returns NUM_SAMPLES independent responses via repeated
 #  queries, which generally performs better than top-k responses from one
 #  query [1].
-# [1] TODO(@happy-qop): Update the link.
+# [1] https://arxiv.org/pdf/2307.12469
 # WARN: Avoid large NUM_SAMPLES in highly parallelized local experiments.
 # It controls the number of LLM responses per prompt, which may exceed your
 # LLM's limit on query-per-second.
-NUM_SAMPLES = 2
+NUM_SAMPLES = 20
 MAX_TOKENS: int = 4096
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 1

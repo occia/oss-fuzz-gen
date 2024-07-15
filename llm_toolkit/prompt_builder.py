@@ -25,6 +25,8 @@ import jinja2
 import requests
 import yaml
 
+import headerfiles
+
 from data_prep import introspector, project_targets
 from experiment import oss_fuzz_checkout
 from experiment.benchmark import Benchmark, FileType
@@ -1056,9 +1058,11 @@ class CSpecificBuilder(PromptBuilder):
                                       function_source)
 
     # Set header inclusion string if there are any headers.
-    headers_to_include = \
-        introspector.query_introspector_header_files_to_include(
-        self.benchmark.project, self.benchmark.function_signature)
+    headers_to_include = headerfiles.get_proj_headers(self.benchmark.project)
+    for header in introspector.query_introspector_header_files_to_include(
+        self.benchmark.project, self.benchmark.function_signature):
+      if header not in headers_to_include:
+        headers_to_include.append(header)
     header_inclusion_string = ''
     if headers_to_include:
       header_inclusion_string = ', '.join(headers_to_include)
