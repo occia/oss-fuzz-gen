@@ -1058,7 +1058,7 @@ class CSpecificBuilder(PromptBuilder):
                                       function_source)
 
     # Set header inclusion string if there are any headers.
-    headers_to_include = headerfiles.get_proj_headers(self.benchmark.project)
+    headers_to_include = headerfiles.api.get_proj_headers(self.benchmark.project)
     for header in introspector.query_introspector_header_files_to_include(
         self.benchmark.project, self.benchmark.function_signature):
       if header not in headers_to_include:

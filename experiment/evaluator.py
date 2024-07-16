@@ -31,7 +31,7 @@ from experiment.workdir import WorkDirs
 from llm_toolkit import code_fixer, crash_triager
 from llm_toolkit.crash_triager import TriageResult
 
-LLM_FIX_LIMIT = int(os.getenv('LLM_FIX_LIMIT', '5'))
+LLM_FIX_LIMIT = int(os.getenv('LLM_FIX_LIMIT', '0'))
 
 OSS_FUZZ_COVERAGE_BUCKET = 'oss-fuzz-coverage'
 
