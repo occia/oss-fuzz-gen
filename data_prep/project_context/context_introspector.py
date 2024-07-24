@@ -108,6 +108,7 @@ class ContextRetriever:
 
   def _get_files_to_include(self) -> list[str]:
     proj_header_files = headerfiles.get_proj_headers(self._benchmark.project)
+    #proj_header_files = []
     type_based_files = self._infer_files_via_types()
 
     header_files = proj_header_files

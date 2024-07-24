@@ -1,7 +1,7 @@
 {% if headers %}
 
-The code block below contains the header files which you must include. The function requires these header files to successfully compile.
-If the headers are private, do not include them.
+The code block below contains the project related header files which you must include. The function requires these header files to successfully compile.
+Only the following project related header files need to be included.
 Header files:
 <code>
 {{ headers }}
