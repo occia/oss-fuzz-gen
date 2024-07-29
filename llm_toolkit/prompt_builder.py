@@ -119,9 +119,11 @@ class DefaultTemplateBuilder(PromptBuilder):
 
   def __init__(self,
                model: models.LLM,
+               benchmark: Benchmark,
                template_dir: str = DEFAULT_TEMPLATE_DIR):
     super().__init__(model)
     self._template_dir = template_dir
+    self.benchmark = benchmark
 
     # Load templates.
     self.priming_template_file = self._find_template(template_dir,
