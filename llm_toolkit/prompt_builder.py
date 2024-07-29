@@ -109,6 +109,8 @@ class PromptBuilder:
   def post_process_generated_code(self, generated_code: str) -> str:
     """Allows prompt builder to adjust the generated code."""
     # return the same by default
+    headers_to_include = headerfiles.get_proj_headers(self.benchmark.project)
+    generated_code = '\n'.join([ f'#include "{header}"' for header in headers_to_include ]) + '\n' + generated_code
     return generated_code
 
 

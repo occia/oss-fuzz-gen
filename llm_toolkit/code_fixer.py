@@ -419,7 +419,7 @@ def apply_llm_fix(ai_binary: str,
       temperature=temperature,
   )
 
-  builder = prompt_builder.DefaultTemplateBuilder(fixer_model)
+  builder = prompt_builder.DefaultTemplateBuilder(fixer_model, benchmark)
 
   context = _collect_context(benchmark, errors)
   instruction = _collect_instructions(benchmark, errors,
