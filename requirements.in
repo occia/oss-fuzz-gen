@@ -13,4 +13,4 @@ PyYAML==6.0.1
 requests==2.32.0
 tiktoken==0.7.0
 yapf==0.40.1
-headerfiles==0.3
+headerfiles==0.4

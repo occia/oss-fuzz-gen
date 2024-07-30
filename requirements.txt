@@ -91,7 +91,7 @@ grpcio-status==1.62.2
     # via google-api-core
 h11==0.14.0
     # via httpcore
-headerfiles==0.3
+headerfiles==0.4
     # via -r requirements.in
 httpcore==1.0.5
     # via httpx
