@@ -27,6 +27,7 @@ import traceback
 from abc import abstractmethod
 from typing import Any, Callable, Optional, Type
 
+import anthropic
 import openai
 import tiktoken
 import vertexai
@@ -109,8 +110,7 @@ class LLM:
     """All subclasses."""
     yield cls
     for subcls in cls.__subclasses__():
-      for subsubcls in subcls.all_llm_subclasses():
-        yield subsubcls
+      yield from subcls.all_llm_subclasses()
 
   @classmethod
   def all_llm_names(cls):
@@ -206,7 +206,7 @@ class GPT(LLM):
     try:
       encoder = tiktoken.encoding_for_model(self.name)
     except KeyError:
-      logger.info(f'Could not get a tiktoken encoding for {self.name}.')
+      logger.info('Could not get a tiktoken encoding for %s.', self.name)
       encoder = tiktoken.get_encoding('cl100k_base')
 
     num_tokens = 0
@@ -230,10 +230,10 @@ class GPT(LLM):
                 log_output: bool = False) -> None:
     """Queries OpenAI's API and stores response in |response_dir|."""
     if self.ai_binary:
-      logger.info(f'OpenAI does not use local AI binary: {self.ai_binary}')
+      raise ValueError(f'OpenAI does not use local AI binary: {self.ai_binary}')
     if self.temperature_list:
-      logger.info(
-          f'OpenAI does not allow temperature list: {self.temperature_list}')
+      logger.info('OpenAI does not allow temperature list: %s',
+                  self.temperature_list)
 
     client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
@@ -263,6 +263,78 @@ class GPT4o(GPT):
   name = 'gpt-4o'
 
 
+class Claude(LLM):
+  """Anthropic's Claude model encapsulator."""
+
+  _max_output_tokens = 4096
+  _vertex_ai_model = ''
+  context_window = 200000
+
+  # ================================ Prompt ================================ #
+  def estimate_token_num(self, text) -> int:
+    """Estimates the number of tokens in |text|."""
+    client = anthropic.Client()
+    return client.count_tokens(text)
+
+  def prompt_type(self) -> type[prompts.Prompt]:
+    """Returns the expected prompt type."""
+    return prompts.ClaudePrompt
+
+  def get_model(self) -> str:
+    return self._vertex_ai_model
+
+  # ============================== Generation ============================== #
+  def query_llm(self,
+                prompt: prompts.Prompt,
+                response_dir: str,
+                log_output: bool = False) -> None:
+    """Queries Claude's API and stores response in |response_dir|."""
+    if self.ai_binary:
+      raise ValueError(f'Claude does not use local AI binary: {self.ai_binary}')
+    if self.temperature_list:
+      logger.info('Claude does not allow temperature list: %s',
+                  self.temperature_list)
+
+    vertex_ai_locations = os.getenv('VERTEX_AI_LOCATIONS',
+                                    'europe-west1').split(',')
+    project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'oss-fuzz')
+    region = random.sample(vertex_ai_locations, 1)[0]
+    client = anthropic.AnthropicVertex(region=region, project_id=project_id)
+
+    completion = self.with_retry_on_error(
+        lambda: client.messages.create(max_tokens=self._max_output_tokens,
+                                       messages=prompt.get(),
+                                       model=self.get_model(),
+                                       temperature=self.temperature),
+        anthropic.AnthropicError)
+    if log_output:
+      logger.info(completion)
+    for index, choice in enumerate(completion.content):
+      content = choice.text
+      self._save_output(index, content, response_dir)
+
+
+class ClaudeHaikuV3(Claude):
+  """Claude Haiku 3."""
+
+  name = 'vertex_ai_claude-3-haiku'
+  _vertex_ai_model = 'claude-3-haiku@20240307'
+
+
+class ClaudeOpusV3(Claude):
+  """Claude Opus 3."""
+
+  name = 'vertex_ai_claude-3-opus'
+  _vertex_ai_model = 'claude-3-opus@20240229'
+
+
+class ClaudeSonnetV3D5(Claude):
+  """Claude Sonnet 3.5."""
+
+  name = 'vertex_ai_claude-3-5-sonnet'
+  _vertex_ai_model = 'claude-3-5-sonnet@20240620'
+
+
 class GoogleModel(LLM):
   """Generic Google model."""
 
@@ -282,12 +354,12 @@ class GoogleModel(LLM):
                 log_output: bool = False) -> None:
     """Queries a Google LLM and stores results in |response_dir|."""
     if not self.ai_binary:
-      logger.info(
-          f'Error: This model requires a local AI binary: {self.ai_binary}')
+      logger.info('Error: This model requires a local AI binary: %s',
+                  self.ai_binary)
       sys.exit(1)
     if self.temperature_list:
-      logger.info('AI Binary does not implement temperature list: '
-                  f'{self.temperature_list}')
+      logger.info('AI Binary does not implement temperature list: %s',
+                  self.temperature_list)
 
     with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
       f.write(prompt.get())
@@ -314,9 +386,9 @@ class GoogleModel(LLM):
       stdout, stderr = proc.communicate()
 
       if proc.returncode != 0:
-        logger.info(f'Failed to generate targets with prompt {prompt.get()}')
-        logger.info(f'stdout: {stdout}')
-        logger.info(f'stderr: {stderr}')
+        logger.info('Failed to generate targets with prompt %s', prompt.get())
+        logger.info('stdout: %s', stdout)
+        logger.info('stderr: %s', stderr)
     finally:
       os.unlink(prompt_path)
 
@@ -346,9 +418,8 @@ class VertexAIModel(GoogleModel):
     """Prepares the parameter dictionary for LLM query."""
     return [{
         'temperature':
-            self.temperature_list[index % len(self.temperature_list)] if
-            (self.temperature_list and
-             len(self.temperature_list) > index) else self.temperature,
+            self.temperature_list[index % len(self.temperature_list)]
+            if self.temperature_list else self.temperature,
         'max_output_tokens':
             self._max_output_tokens
     } for index in range(self.num_samples)]
@@ -359,7 +430,7 @@ class VertexAIModel(GoogleModel):
                 log_output: bool = False) -> None:
     del log_output
     if self.ai_binary:
-      logger.info(f'VertexAI does not use local AI binary: {self.ai_binary}')
+      logger.info('VertexAI does not use local AI binary: %s', self.ai_binary)
 
     model = self.get_model()
     parameters_list = self._prepare_parameters()
@@ -399,6 +470,7 @@ class GeminiModel(VertexAIModel):
             threshold=generative_models.HarmBlockThreshold.BLOCK_ONLY_HIGH,
         ),
     ]
+    logger.info('%s generating response with config: %s', self.name, config)
     return model.generate_content(prompt,
                                   generation_config=config,
                                   safety_settings=safety_config).text

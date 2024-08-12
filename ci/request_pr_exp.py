@@ -43,6 +43,7 @@ REQUEST_CPU = 6
 REQUEST_MEM = 30
 NUM_SAMPLES = 2
 NUM_FIXES = 2
+VARY_TEMPERATURE = True
 
 PR_LINK_PREFIX = 'https://github.com/google/oss-fuzz-gen/pull'
 JOB_LINK_PREFIX = ('https://console.cloud.google.com/kubernetes/job/'
@@ -110,11 +111,6 @@ def _parse_args(cmd) -> argparse.Namespace:
       help=('Delay each benchmark experiment by N seconds, default: '
             f'{EXP_DELAY}.'))
   parser.add_argument(
-      '-f',
-      '--force',
-      action='store_true',
-      help='Remove existing GKE job and bucket before creating new ones.')
-  parser.add_argument(
       '-to',
       '--fuzzing-timeout',
       type=int,
@@ -142,13 +138,20 @@ def _parse_args(cmd) -> argparse.Namespace:
       '--num-samples',
       type=int,
       default=NUM_SAMPLES,
-      help='The number of samples to request from LLM, default: {NUM_SAMPLES}')
+      help=f'The number of samples to request from LLM, default: {NUM_SAMPLES}')
   parser.add_argument(
       '-nf',
       '--llm-fix-limit',
       type=int,
       default=NUM_FIXES,
-      help='The number of fixes to request from LLM, default: {NUM_FIXES}')
+      help=f'The number of fixes to request from LLM, default: {NUM_FIXES}')
+  parser.add_argument(
+      '-vt',
+      '--vary-temperature',
+      type=bool,
+      default=VARY_TEMPERATURE,
+      help=('Use different temperatures for each sample, default: '
+            f'{VARY_TEMPERATURE}'))
   args = parser.parse_args(cmd)
 
   assert os.path.isfile(
@@ -224,9 +227,8 @@ def _prepare_experiment_info(args: argparse.Namespace) -> tuple[str, str, str]:
       f'{BUCKET_GS_LINK_PREFIX}/{datetime.now().strftime("%Y-%m-%d")}-'
       f'{args.pr_id}-{args.name_suffix}-{args.benchmark_set}')
 
-  if args.force:
-    logging.info(
-        'FORCE mode enable, will first remove existing GKE job and bucket.')
+  logging.info(
+      'FORCE mode enable, will first remove existing GKE job and bucket.')
 
   logging.info(
       'Requesting a GKE experiment named %s:\nPR: %s\nJOB: %s\nREPORT: %s\n'
@@ -273,6 +275,7 @@ def _fill_template(args: argparse.Namespace) -> str:
     exp_env_vars['GKE_EXP_LOCAL_INTROSPECTOR'] = 'true'
   exp_env_vars['GKE_EXP_NUM_SAMPLES'] = f'{args.num_samples}'
   exp_env_vars['GKE_EXP_LLM_FIX_LIMIT'] = f'{args.llm_fix_limit}'
+  exp_env_vars['GKE_EXP_VARY_TEMPERATURE'] = f'{args.vary_temperature}'.lower()
 
   with open(args.gke_template, 'r') as file:
     yaml_template = file.read()
@@ -296,8 +299,7 @@ def main(cmd=None):
   args = _parse_args(cmd)
   gke_job_name, bucket_link, bucket_gs_link = _prepare_experiment_info(args)
   _get_gke_credential(args)
-  if args.force:
-    _remove_existing_job_bucket(gke_job_name, bucket_link, bucket_gs_link)
+  _remove_existing_job_bucket(gke_job_name, bucket_link, bucket_gs_link)
   _request_experiment(_fill_template(args))
 
 
