@@ -77,6 +77,7 @@ FUZZ_ERROR_SUMMARY = 'The code can build successfully but has a runtime issue: '
 
 C_PROMPT_HEADERS_TO_ALWAYS_INCLUDES = ['stdio.h', 'stdlib.h', 'stdint.h']
 
+HEADERFILES = bool(os.getenv('LLM_HEADERFILES', ''))
 
 class PromptBuilder:
   """Prompt builder."""
@@ -106,6 +107,8 @@ class PromptBuilder:
   def post_process_generated_code(self, generated_code: str) -> str:
     """Allows prompt builder to adjust the generated code."""
     # return the same by default
+    if not HEADERFILES:
+      return generated_code
     headers_to_include = headerfiles.get_proj_headers(self.benchmark.project)
     generated_code = '\n'.join([ f'#include "{header}"' for header in headers_to_include ]) + '\n' + generated_code
     return generated_code
@@ -1062,8 +1065,10 @@ class CSpecificBuilder(PromptBuilder):
                                       function_source)
 
     # Set header inclusion string if there are any headers.
-    headers_to_include = headerfiles.get_proj_headers(self.benchmark.project)
-    #headers_to_include = []
+    if HEADERFILES:
+      headers_to_include = headerfiles.get_proj_headers(self.benchmark.project)
+    else:
+      headers_to_include = []
     for header in introspector.query_introspector_header_files_to_include(
         self.benchmark.project, self.benchmark.function_signature):
       if header not in headers_to_include:

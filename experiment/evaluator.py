@@ -24,6 +24,8 @@ from typing import Optional
 
 from google.cloud import storage
 
+import headerfiles.api as headerfiles
+
 from experiment import builder_runner, oss_fuzz_checkout, textcov
 from experiment.benchmark import Benchmark
 from experiment.builder_runner import BuildResult, RunResult
@@ -36,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 LLM_FIX_LIMIT = int(os.getenv('LLM_FIX_LIMIT', '0'))
 GENERATE_CORPUS = bool(os.getenv('LLM_GENERATE_CORPUS', ''))
+HEADERFILES = bool(os.getenv('LLM_HEADERFILES', ''))
 
 OSS_FUZZ_COVERAGE_BUCKET = 'oss-fuzz-coverage'
 
@@ -276,6 +279,21 @@ class Evaluator:
     dual_logger.log(f'Warning: no crash info in {generated_oss_fuzz_project}.')
     return TriageResult.NOT_APPLICABLE
 
+  def update_build_with_headerfiles_installation(self, generated_oss_fuzz_project):
+    """Updates the build script with header files installation & include logic"""
+    generated_project_path = os.path.join(oss_fuzz_checkout.OSS_FUZZ_DIR,
+                                          'projects',
+                                          generated_oss_fuzz_project)
+    updated_build_script = headerfiles.get_build_script(self.benchmark.project, "/build_install_dir")
+
+    # Append the script to the existing build script.
+    with open(os.path.join(generated_project_path, 'build.sh'), 'r') as f:
+      updated_build_script += '\n' + f.read()
+    
+    # Write the updated build script back.
+    with open(os.path.join(generated_project_path, 'build.sh'), 'w') as f:
+      f.write(updated_build_script)
+
   def extend_build_with_corpus(self, ai_binary, target_path,
                                generated_oss_fuzz_project):
     """Extends an OSS-Fuzz project with corpus generated programmatically."""
@@ -320,6 +338,9 @@ class Evaluator:
 
     # TODO: Log build failure.
     # TODO: Log run success/failure.
+
+    if HEADERFILES:
+      self.update_build_with_headerfiles_installation(generated_oss_fuzz_project)
 
     if GENERATE_CORPUS:
       self.extend_build_with_corpus(ai_binary, target_path,
